@@ -1,12 +1,10 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
-import { Check, X, Shield, AlertTriangle, MessageCircle, Users } from "lucide-react";
+import { Check, X, Shield, Settings, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface TeamMember {
@@ -20,28 +18,49 @@ const Index = () => {
   const [inputNumber, setInputNumber] = useState("");
   const [validationResult, setValidationResult] = useState<'trusted' | 'suspicious' | null>(null);
   const [foundMember, setFoundMember] = useState<TeamMember | null>(null);
+  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [trustedTeam, setTrustedTeam] = useState<TeamMember[]>([]);
+  const [newMember, setNewMember] = useState({ name: "", whatsapp: "", role: "" });
   const { toast } = useToast();
 
-  // Dados mockados da equipe de suporte
-  const trustedTeam: TeamMember[] = [
-    { name: "Maria Silva", whatsapp: "11999887766", role: "Supervisora de Suporte", verified: true },
-    { name: "João Santos", whatsapp: "11988776655", role: "Analista Senior", verified: true },
-    { name: "Ana Costa", whatsapp: "11977665544", role: "Analista Pleno", verified: true },
-    { name: "Pedro Lima", whatsapp: "11966554433", role: "Analista Junior", verified: true },
-    { name: "Carla Oliveira", whatsapp: "11955443322", role: "Coordenadora", verified: true },
-  ];
+  // Carregar dados do localStorage
+  useEffect(() => {
+    const savedTeam = localStorage.getItem('trustedTeam');
+    if (savedTeam) {
+      setTrustedTeam(JSON.parse(savedTeam));
+    } else {
+      // Dados iniciais
+      const initialTeam: TeamMember[] = [
+        { name: "Maria Silva", whatsapp: "11999887766", role: "Supervisora de Suporte", verified: true },
+        { name: "João Santos", whatsapp: "11988776655", role: "Analista Senior", verified: true },
+        { name: "Ana Costa", whatsapp: "11977665544", role: "Analista Pleno", verified: true },
+      ];
+      setTrustedTeam(initialTeam);
+      localStorage.setItem('trustedTeam', JSON.stringify(initialTeam));
+    }
+  }, []);
+
+  // Salvar dados no localStorage
+  const saveTeamData = (team: TeamMember[]) => {
+    setTrustedTeam(team);
+    localStorage.setItem('trustedTeam', JSON.stringify(team));
+  };
 
   const formatWhatsAppNumber = (number: string) => {
-    // Remove tudo que não é número
     const cleanNumber = number.replace(/\D/g, '');
-    
-    // Formata o número no padrão brasileiro
     if (cleanNumber.length === 11) {
       return cleanNumber.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
     } else if (cleanNumber.length === 10) {
       return cleanNumber.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
     }
     return cleanNumber;
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatWhatsAppNumber(e.target.value);
+    setInputNumber(formatted);
   };
 
   const validateNumber = () => {
@@ -78,59 +97,203 @@ const Index = () => {
     }
   };
 
-  const reportSuspiciousNumber = () => {
-    toast({
-      title: "Número Reportado",
-      description: "O número suspeito foi reportado para a supervisão. Eles tomarão as medidas necessárias.",
-    });
-    
-    // Aqui você poderia integrar com um sistema de tickets ou email
-    console.log(`Número suspeito reportado: ${inputNumber}`);
-  };
-
   const clearValidation = () => {
     setInputNumber("");
     setValidationResult(null);
     setFoundMember(null);
   };
 
+  const handleAdminLogin = () => {
+    if (adminPassword === "admin123") {
+      setIsAdminMode(true);
+      setShowAdminLogin(false);
+      setAdminPassword("");
+      toast({
+        title: "Login Admin realizado",
+        description: "Você agora pode gerenciar os números de confiança",
+      });
+    } else {
+      toast({
+        title: "Senha incorreta",
+        description: "Tente novamente",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const addNewMember = () => {
+    if (!newMember.name || !newMember.whatsapp || !newMember.role) {
+      toast({
+        title: "Campos obrigatórios",
+        description: "Preencha todos os campos",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newTeamMember: TeamMember = {
+      ...newMember,
+      verified: true,
+    };
+
+    const updatedTeam = [...trustedTeam, newTeamMember];
+    saveTeamData(updatedTeam);
+    setNewMember({ name: "", whatsapp: "", role: "" });
+    
+    toast({
+      title: "Membro adicionado",
+      description: `${newMember.name} foi adicionado à equipe`,
+    });
+  };
+
+  const removeMember = (index: number) => {
+    const memberName = trustedTeam[index].name;
+    const updatedTeam = trustedTeam.filter((_, i) => i !== index);
+    saveTeamData(updatedTeam);
+    
+    toast({
+      title: "Membro removido",
+      description: `${memberName} foi removido da equipe`,
+    });
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 p-4">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 p-4">
+      <div className="max-w-2xl mx-auto space-y-6">
         {/* Header */}
-        <div className="text-center space-y-2">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <MessageCircle className="h-8 w-8 text-green-600" />
-            <h1 className="text-3xl font-bold text-gray-800">Validador WhatsApp</h1>
+        <div className="text-center space-y-4 py-8">
+          <h1 className="text-4xl font-bold text-white mb-6">
+            Verifique a confiabilidade do Número de WhatsApp
+          </h1>
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 text-white/90">
+            <p className="text-lg leading-relaxed">
+              Bem-vindo(a)! Utilize este formulário para verificar se o número de WhatsApp que entrou em contato pertence a um colaborador da <strong className="text-blue-300">Equipe Jonas Kaz</strong>.
+            </p>
+            <p className="mt-3 text-white/80">
+              Basta digitar o número no campo abaixo e, em instantes, informaremos se ele é confiável e oficialmente utilizado por nossa empresa.
+            </p>
           </div>
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            Valide se um número de WhatsApp pertence à nossa equipe de suporte antes de confiar em ofertas nos grupos
-          </p>
+          
+          {/* Admin Button */}
+          <Button 
+            onClick={() => setShowAdminLogin(!showAdminLogin)}
+            variant="outline"
+            size="sm"
+            className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Admin
+          </Button>
         </div>
 
+        {/* Admin Login */}
+        {showAdminLogin && !isAdminMode && (
+          <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+            <CardHeader>
+              <CardTitle className="text-white">Login Administrativo</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Input
+                type="password"
+                placeholder="Digite a senha admin"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAdminLogin()}
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/60"
+              />
+              <Button onClick={handleAdminLogin} className="w-full bg-blue-600 hover:bg-blue-700">
+                Entrar
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Admin Panel */}
+        {isAdminMode && (
+          <Card className="bg-white/10 backdrop-blur-sm border-white/20">
+            <CardHeader>
+              <CardTitle className="text-white">Painel Administrativo</CardTitle>
+              <CardDescription className="text-white/70">
+                Gerencie os números de confiança da equipe
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Add New Member */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <Input
+                  placeholder="Nome"
+                  value={newMember.name}
+                  onChange={(e) => setNewMember({...newMember, name: e.target.value})}
+                  className="bg-white/10 border-white/20 text-white placeholder:text-white/60"
+                />
+                <Input
+                  placeholder="WhatsApp"
+                  value={newMember.whatsapp}
+                  onChange={(e) => setNewMember({...newMember, whatsapp: e.target.value})}
+                  className="bg-white/10 border-white/20 text-white placeholder:text-white/60"
+                />
+                <Input
+                  placeholder="Cargo"
+                  value={newMember.role}
+                  onChange={(e) => setNewMember({...newMember, role: e.target.value})}
+                  className="bg-white/10 border-white/20 text-white placeholder:text-white/60"
+                />
+              </div>
+              <Button onClick={addNewMember} className="w-full bg-green-600 hover:bg-green-700">
+                <Plus className="h-4 w-4 mr-2" />
+                Adicionar Membro
+              </Button>
+
+              {/* Team List */}
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {trustedTeam.map((member, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+                    <div className="text-white">
+                      <div className="font-medium">{member.name}</div>
+                      <div className="text-sm text-white/70">{formatWhatsAppNumber(member.whatsapp)} - {member.role}</div>
+                    </div>
+                    <Button
+                      onClick={() => removeMember(index)}
+                      variant="destructive"
+                      size="sm"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              <Button 
+                onClick={() => setIsAdminMode(false)} 
+                variant="outline"
+                className="w-full bg-white/10 border-white/20 text-white hover:bg-white/20"
+              >
+                Sair do Admin
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Validador Principal */}
-        <Card className="shadow-lg border-green-200">
-          <CardHeader className="bg-green-50">
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-green-600" />
-              Validar Número
+        <Card className="bg-white/10 backdrop-blur-sm border-white/20 shadow-2xl">
+          <CardHeader className="text-center">
+            <CardTitle className="flex items-center justify-center gap-2 text-white text-2xl">
+              <Shield className="h-6 w-6 text-blue-400" />
+              Validador de Número
             </CardTitle>
-            <CardDescription>
-              Digite o número de WhatsApp que você deseja validar
-            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4 pt-6">
+          <CardContent className="space-y-6">
             <div className="flex gap-2">
               <Input
                 placeholder="Ex: (11) 99999-9999"
                 value={inputNumber}
-                onChange={(e) => setInputNumber(e.target.value)}
-                className="flex-1"
+                onChange={handleInputChange}
+                className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/60 text-lg"
                 onKeyDown={(e) => e.key === 'Enter' && validateNumber()}
               />
               <Button 
                 onClick={validateNumber} 
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-blue-600 hover:bg-blue-700 px-8"
                 disabled={!inputNumber.trim()}
               >
                 Validar
@@ -139,6 +302,7 @@ const Index = () => {
                 <Button 
                   onClick={clearValidation} 
                   variant="outline"
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
                 >
                   Limpar
                 </Button>
@@ -147,14 +311,14 @@ const Index = () => {
 
             {/* Resultado da Validação */}
             {validationResult === 'trusted' && foundMember && (
-              <Alert className="border-green-200 bg-green-50">
-                <Check className="h-4 w-4 text-green-600" />
+              <Alert className="border-green-400/50 bg-green-500/20 backdrop-blur-sm">
+                <Check className="h-5 w-5 text-green-400" />
                 <AlertDescription>
-                  <div className="space-y-2">
-                    <div className="font-semibold text-green-800">
-                      ✅ Número CONFIÁVEL - Membro da Equipe
+                  <div className="space-y-3">
+                    <div className="font-bold text-green-300 text-lg">
+                      ✅ NÚMERO CONFIÁVEL - Membro da Equipe Jonas Kaz
                     </div>
-                    <div className="text-sm text-green-700">
+                    <div className="text-green-200 bg-green-500/10 p-3 rounded">
                       <strong>Nome:</strong> {foundMember.name}<br />
                       <strong>Cargo:</strong> {foundMember.role}<br />
                       <strong>WhatsApp:</strong> {formatWhatsAppNumber(foundMember.whatsapp)}
@@ -165,80 +329,20 @@ const Index = () => {
             )}
 
             {validationResult === 'suspicious' && (
-              <Alert className="border-red-200 bg-red-50">
-                <AlertTriangle className="h-4 w-4 text-red-600" />
+              <Alert className="border-red-400/50 bg-red-500/20 backdrop-blur-sm">
+                <X className="h-5 w-5 text-red-400" />
                 <AlertDescription>
-                  <div className="space-y-3">
-                    <div className="font-semibold text-red-800">
-                      ⚠️ Número SUSPEITO - NÃO é da nossa equipe
+                  <div className="space-y-4">
+                    <div className="font-bold text-red-300 text-lg">
+                      ⚠️ NÚMERO SUSPEITO - NÃO é da Equipe Jonas Kaz
                     </div>
-                    <div className="text-sm text-red-700">
-                      Este número não pertence à nossa equipe de suporte. Se alguém está se passando por membro da equipe, reporte imediatamente.
+                    <div className="text-red-200 bg-red-500/10 p-3 rounded">
+                      Este número não pertence à nossa equipe oficial. Se alguém está se passando por membro da Equipe Jonas Kaz, reporte imediatamente para nossos canais oficiais.
                     </div>
-                    <Button 
-                      onClick={reportSuspiciousNumber}
-                      variant="destructive"
-                      size="sm"
-                      className="mt-2"
-                    >
-                      🚨 Reportar Número Suspeito
-                    </Button>
                   </div>
                 </AlertDescription>
               </Alert>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Lista da Equipe */}
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-blue-600" />
-              Equipe de Suporte Oficial
-            </CardTitle>
-            <CardDescription>
-              Números verificados da nossa equipe de suporte
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3">
-              {trustedTeam.map((member, index) => (
-                <div key={index} className="flex items-center justify-between p-3 rounded-lg border bg-gray-50 hover:bg-gray-100 transition-colors">
-                  <div className="space-y-1">
-                    <div className="font-medium text-gray-800">{member.name}</div>
-                    <div className="text-sm text-gray-600">{member.role}</div>
-                  </div>
-                  <div className="text-right space-y-1">
-                    <div className="font-mono text-sm text-gray-700">
-                      {formatWhatsAppNumber(member.whatsapp)}
-                    </div>
-                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
-                      <Check className="h-3 w-3 mr-1" />
-                      Verificado
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Dicas de Segurança */}
-        <Card className="shadow-lg border-amber-200">
-          <CardHeader className="bg-amber-50">
-            <CardTitle className="flex items-center gap-2 text-amber-800">
-              <AlertTriangle className="h-5 w-5" />
-              Dicas de Segurança
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-3 text-sm text-gray-700">
-              <div>• <strong>Sempre valide</strong> números antes de confiar em ofertas nos grupos</div>
-              <div>• <strong>Nossa equipe nunca</strong> oferece produtos/serviços diretamente nos grupos</div>
-              <div>• <strong>Em caso de dúvida</strong>, entre em contato com a supervisão</div>
-              <div>• <strong>Reporte imediatamente</strong> qualquer número suspeito que se passe pela equipe</div>
-            </div>
           </CardContent>
         </Card>
       </div>
